@@ -76,7 +76,9 @@ XSpi Spi1Instance;
 XGpio Gpio0; /* The Instance of the GPIO Driver */
 
 XGpio Gpio1;
+
 XGpio Gpio2;
+XIntc IntcInstance;   // Interrupt controller instance
 
 XUartLite UartLite;		/* Instance of the UartLite Device */
 
@@ -101,6 +103,10 @@ uint8_t spi_rx_buffer[32];
 int16_t accel[3], gyro[3];
 float gyro_dps[3];
 uint8_t dev_id;
+
+uint64_t echo_start = 0;
+uint64_t echo_end = 0;
+int echo_done = 0;
 
 
 void toggle_led(int led_num) {
@@ -136,6 +142,15 @@ void trigger_hcsr04() {
     
     // Set TRIG low
     XGpio_DiscreteWrite(&Gpio1, TRIG_CHANNEL, 0); // both bits are reseted
+}
+
+uint32_t measure_distance_us_interrupt() {
+    if (echo_done) {
+        uint64_t delta = echo_end - echo_start;
+        echo_done = 0;  // reset for next measurement
+        return (uint32_t)(delta / 100);  // convert counts to microseconds at 100 MHz
+    }
+    return 0;  // no valid measurement yet
 }
 
 uint32_t measure_distance_us() {
@@ -199,6 +214,27 @@ int i2c_read_temperature(XIic *iic, u8 slave7, u8 reg, int16_t *temp_out) {
 
 float adt7420_convert_temp(int16_t raw_temp) {
     return (float)raw_temp / 128.0f;
+}
+
+void GpioEchoHandler(void *InstancePtr) {
+    // Clear the interrupt
+    XGpio_InterruptClear(&Gpio2, 0x1);
+
+    uint32_t gpio_val = XGpio_DiscreteRead(&Gpio2, ECHO_CHANNEL);
+
+    uint64_t now = XTmrCtr_GetValue(&TimerInstance, 0);
+
+    if (gpio_val) {
+        // Rising edge: Echo started
+        echo_start = now;
+        echo_done = 0;
+    } 
+    else {
+        // Falling edge: Echo ended
+        echo_end = now;
+        echo_done = 1;
+    }
+
 }
 
 int main(void)
@@ -300,7 +336,36 @@ int main(void)
 		return XST_FAILURE;
 	}
 
-	XGpio_SetDataDirection(&Gpio1, ECHO_CHANNEL, 0x3); // both pins are input
+    Status = XIntc_Initialize(&IntcInstance, XPAR_XINTC_0_BASEADDR);
+    if (Status != XST_SUCCESS) {
+        return XST_FAILURE;
+    }
+
+   	XGpio_SetDataDirection(&Gpio2, ECHO_CHANNEL, 0x3); // both pins are input
+
+    // Connect the GPIO interrupt handler to the interrupt controller
+    Status = XIntc_Connect(&IntcInstance, XPAR_FABRIC_AXI_GPIO_2_INTR, (XInterruptHandler)GpioEchoHandler, &Gpio2);
+    if (Status != XST_SUCCESS) {
+        return XST_FAILURE;
+    }
+
+    // Start the interrupt controller in real mode
+    Status = XIntc_Start(&IntcInstance, XIN_REAL_MODE);
+    if (Status != XST_SUCCESS) {
+        return XST_FAILURE;
+    }
+
+    // Enable the GPIO interrupt in the interrupt controller
+    XIntc_Enable(&IntcInstance, XPAR_FABRIC_AXI_GPIO_2_INTR);
+
+    // Setup the exception handling for interrupts
+    Xil_ExceptionInit();
+    Xil_ExceptionRegisterHandler(XIL_EXCEPTION_ID_INT, (Xil_ExceptionHandler)XIntc_InterruptHandler, &IntcInstance);
+    Xil_ExceptionEnable();
+
+    XGpio_InterruptEnable(&Gpio2, 0x1);  // Enable interrupt on first input pin (assuming echo on pin 0)
+    XGpio_InterruptGlobalEnable(&Gpio2);
+
 
 
 
@@ -441,7 +506,9 @@ int main(void)
 			trigger_hcsr04();
 			usleep(100); // allow echo to rise if needed
 
-			uint32_t duration_us = measure_distance_us();
+			//uint32_t duration_us = measure_distance_us();
+            uint32_t duration_us = measure_distance_us_interrupt();
+
             float distance = (duration_us * 0.0343) / 2; // cm
             
             xil_printf("Duration: %d\r\n", duration_us);
@@ -487,3 +554,4 @@ int main(void)
 	}
 
 }
+
