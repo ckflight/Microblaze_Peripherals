@@ -40,7 +40,7 @@
 #include "xiic.h"
 #include "xil_exception.h"
 
-#define USE_HCSR04	    0
+#define USE_HCSR04	    1
 #define USE_ADT7420	    1
 #define USE_ADXL362	    1
 
@@ -128,17 +128,20 @@ void blink_led(void){
 }
 
 void trigger_hcsr04() {
+    
     // Set TRIG high
-    XGpio_DiscreteWrite(&Gpio1, TRIG_CHANNEL, 1);
+    XGpio_DiscreteWrite(&Gpio1, TRIG_CHANNEL, 1); // bit 1 of 2 gpio output pins is set
+    
     usleep(10);  // 10 microseconds
+    
     // Set TRIG low
-    XGpio_DiscreteWrite(&Gpio1, TRIG_CHANNEL, 0);
+    XGpio_DiscreteWrite(&Gpio1, TRIG_CHANNEL, 0); // both bits are reseted
 }
 
 uint32_t measure_distance_us() {
 
     // Wait for echo HIGH
-    while (XGpio_DiscreteRead(&Gpio2, ECHO_CHANNEL) == 0);
+    while (XGpio_DiscreteRead(&Gpio2, ECHO_CHANNEL) == 0); // read first bit of 2 gpio input pins
 
     u64 start = XTmrCtr_GetValue(&TimerInstance, 0);
 
@@ -147,7 +150,7 @@ uint32_t measure_distance_us() {
 
     u64 delta = XTmrCtr_GetValue(&TimerInstance, 0) - start;
     
-    return delta;
+    return delta / 100; // timer counter count 100 in 1 sec since its clock is 100mhz
 }
 
 int i2c_read_register(XIic *iic, u8 slave7, u8 reg, u8 *out) {
@@ -381,12 +384,12 @@ int main(void)
     }
 
     u8 cfg;
-i2c_read_register(&IicInstance0, 0x48, 0x03, &cfg);
-if (cfg & 0x80) {
-    xil_printf("16-bit mode enabled\r\n");
-} else {
-    xil_printf("13-bit mode enabled\r\n");
-}
+    i2c_read_register(&IicInstance0, 0x48, 0x03, &cfg);
+    if (cfg & 0x80) {
+        xil_printf("16-bit mode enabled\r\n");
+    } else {
+        xil_printf("13-bit mode enabled\r\n");
+    }
 
 
     bytes_recv = 0;
@@ -430,6 +433,8 @@ if (cfg & 0x80) {
             (int)gyro_dps[1], abs((int)(gyro_dps[1] * 100) % 100),
             (int)gyro_dps[2], abs((int)(gyro_dps[2] * 100) % 100));
 		*/
+
+
         XGpio_DiscreteWrite(&Gpio0, LED_CHANNEL, gyro[0]);
 
 		#if USE_HCSR04
@@ -437,7 +442,11 @@ if (cfg & 0x80) {
 			usleep(100); // allow echo to rise if needed
 
 			uint32_t duration_us = measure_distance_us();
-			xil_printf("Duration: %lu us\r\n", duration_us);
+            float distance = (duration_us * 0.0343) / 2; // cm
+            
+            xil_printf("Duration: %d\r\n", duration_us);
+
+			printf("Distance: %.3f\r\n", distance);
 
 			usleep(100); // allow echo to rise if needed
 

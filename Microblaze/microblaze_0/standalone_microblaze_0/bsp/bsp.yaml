@@ -176,6 +176,7 @@ drv_info:
     path: /tools/Xilinx/2025.1/Vitis/data/embeddedsw/XilinxProcessorIPLib/drivers/gpio_v4_12
     examples:
       xgpio_example.c: []
+      xgpio_intr_tapp_example.c: []
       xgpio_low_level_example.c: []
       xgpio_tapp_example.c: []
   axi_iic_0:

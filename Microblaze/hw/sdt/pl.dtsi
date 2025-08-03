@@ -211,7 +211,7 @@
 			xlnx,has-fast = <1>;
 			xlnx,ivar-rst-val = <0x10>;
 			interrupt-controller;
-			xlnx,async-intr = <0xfffffffd>;
+			xlnx,async-intr = <0xfffffffc>;
 			xlnx,name = "microblaze_0_axi_intc";
 		};
 		axi_gpio_0: gpio@40000000 {
@@ -269,12 +269,15 @@
 			xlnx,all-inputs = <0>;
 		};
 		axi_gpio_2: gpio@40020000 {
+			#interrupt-cells = <2>;
+			interrupts = < 0 2 >;
 			xlnx,gpio-board-interface = "Custom";
 			compatible = "xlnx,axi-gpio-2.0" , "xlnx,xps-gpio-1.00.a";
 			xlnx,all-outputs = <0>;
 			#gpio-cells = <2>;
 			xlnx,gpio-width = <2>;
 			clock-frequency = <100000000>;
+			interrupt-parent = <&microblaze_0_axi_intc>;
 			xlnx,dout-default = <0x0>;
 			xlnx,is-dual = <0>;
 			xlnx,ip-name = "axi_gpio";
@@ -284,19 +287,21 @@
 			clocks = <&clk_bus_0>;
 			xlnx,all-outputs-2 = <0>;
 			gpio-controller;
-			xlnx,interrupt-present = <0>;
+			xlnx,interrupt-present = <1>;
 			xlnx,gpio2-board-interface = "Custom";
 			xlnx,edk-iptype = "PERIPHERAL";
 			xlnx,dout-default-2 = <0x0>;
 			status = "okay";
 			xlnx,gpio2-width = <32>;
 			clock-names = "s_axi_aclk";
+			interrupt-controller;
+			interrupt-names = "ip2intc_irpt";
 			xlnx,tri-default = <0xffffffff>;
 			xlnx,name = "axi_gpio_2";
 			xlnx,all-inputs = <1>;
 		};
 		axi_iic_0: i2c@40800000 {
-			interrupts = < 0 2 >;
+			interrupts = < 1 2 >;
 			xlnx,iic-freq-khz = <400>;
 			compatible = "xlnx,axi-iic-2.1" , "xlnx,xps-iic-2.00.a";
 			xlnx,scl-inertial-delay = <0>;
