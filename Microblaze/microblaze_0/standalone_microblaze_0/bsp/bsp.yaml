@@ -63,8 +63,8 @@ os_config:
       default: axi_uartlite_0
       options:
       - None
-      - mdm_1
       - axi_uartlite_0
+      - mdm_1
       description: stdin peripheral
     standalone_stdout:
       name: standalone_stdout
@@ -74,8 +74,8 @@ os_config:
       default: axi_uartlite_0
       options:
       - None
-      - mdm_1
       - axi_uartlite_0
+      - mdm_1
       description: stdout peripheral
     standalone_ttc_select_cntr:
       name: standalone_ttc_select_cntr

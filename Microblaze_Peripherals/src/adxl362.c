@@ -41,15 +41,16 @@ uint8_t ADXL362_ReadDeviceID(XSpi *SpiInstancePtr)
 
 void ADXL362_ReadXYZ(XSpi *SpiInstancePtr, int16_t *x, int16_t *y, int16_t *z, uint8_t *rx_buf)
 {
-    uint8_t tx[7] = {0x0B, 0x0E, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
-    uint8_t rx[7] = {0};
+    uint8_t tx[8] = {0x0B, 0x0E, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+    uint8_t rx[8] = {0};
 
     XSpi_SetSlaveSelect(SpiInstancePtr, 0x01);
-    XSpi_Transfer(SpiInstancePtr, tx, rx, 7);
+    XSpi_Transfer(SpiInstancePtr, tx, rx, 8);
 
     memcpy(rx_buf, rx, sizeof(rx));  // Copies all 9 bytes from rx[] to rx_buf[]
 
     *x = (int16_t)((rx[3] << 8) | rx[2]);
     *y = (int16_t)((rx[5] << 8) | rx[4]);
     *z = (int16_t)((rx[7] << 8) | rx[6]);
+    
 }

@@ -17,7 +17,6 @@
  *   ps7_uart    115200 (configured by bootrom/bsp)
  */
 
-
 #include <stdio.h>
 #include "platform.h"
 #include "xparameters.h"
@@ -264,7 +263,7 @@ int main(void)
 
 
 
-	// Initialize the GPIO driver
+	// GPIO0 Init
 	Status = XGpio_Initialize(&Gpio0, XPAR_XGPIO_0_BASEADDR);
 	if (Status != XST_SUCCESS) {
 		xil_printf("GPIO0 Initialization Failed\r\n");
@@ -275,6 +274,9 @@ int main(void)
 
 	blink_led();
 
+
+
+
 	// GPIO1 Init
 	Status = XGpio_Initialize(&Gpio1, XPAR_XGPIO_1_BASEADDR);
 	if (Status != XST_SUCCESS) {
@@ -284,6 +286,10 @@ int main(void)
 
 	XGpio_SetDataDirection(&Gpio1, TRIG_CHANNEL, 0x0); // both pins are output
 	
+
+
+
+
 	// GPIO2 Init
 	Status = XGpio_Initialize(&Gpio2, XPAR_XGPIO_2_BASEADDR);
 	if (Status != XST_SUCCESS) {
@@ -298,7 +304,7 @@ int main(void)
 
 
 
-	// Initialize the UartLite driver so that it is ready to use.
+	// UART0 Init
 	Status = XUartLite_Initialize(&UartLite, 0);
 	if (Status != XST_SUCCESS) {
 		return XST_FAILURE;
@@ -310,16 +316,15 @@ int main(void)
 		return XST_FAILURE;
 	}
 
+
+
+
     // SPI0 Init
     Status = XSpi_Initialize(&Spi0Instance, XPAR_AXI_QUAD_SPI_0_BASEADDR);
     if (Status != XST_SUCCESS) {
         xil_printf("SPI Initialization Failed\r\n");
         return XST_FAILURE;
     }
-
-
-
-
 
     // Set options: master mode and manual slave select
     Status = XSpi_SetOptions(&Spi0Instance, XSP_MASTER_OPTION | XSP_MANUAL_SSELECT_OPTION);
@@ -330,6 +335,7 @@ int main(void)
 
     XSpi_Start(&Spi0Instance);// Start the SPI driver
     XSpi_IntrGlobalDisable(&Spi0Instance); // Disable global interrupt mode
+
 
 
 
@@ -394,6 +400,8 @@ if (cfg & 0x80) {
 
 	while (1) {
 		
+        u64 start = XTmrCtr_GetValue(&TimerInstance, 0);
+
 		//uart_tx_buffer[0] = counter++;
 		//uart_tx_buffer[0] = z_val & 0xFF;
 
@@ -461,7 +469,8 @@ if (cfg & 0x80) {
 		toggle_led(16);
 
 
-
+        u64 delta = XTmrCtr_GetValue(&TimerInstance, 0) - start;
+        xil_printf("Timer: %d \r\n", delta);
 
 		
 
