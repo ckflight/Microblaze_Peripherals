@@ -104,9 +104,10 @@ int16_t accel[3], gyro[3];
 float gyro_dps[3];
 uint8_t dev_id;
 
-uint64_t echo_start = 0;
-uint64_t echo_end = 0;
-int echo_done = 0;
+volatile uint64_t echo_start = 0;
+volatile uint64_t echo_end = 0;
+volatile int echo_done = 0;
+volatile uint32_t last_echo_state = 0;
 
 
 void toggle_led(int led_num) {
@@ -216,25 +217,27 @@ float adt7420_convert_temp(int16_t raw_temp) {
     return (float)raw_temp / 128.0f;
 }
 
-void GpioEchoHandler(void *InstancePtr) {
-    // Clear the interrupt
-    XGpio_InterruptClear(&Gpio2, 0x1);
+void GpioEchoHandler(void *CallbackRef) {
+    XGpio *GpioPtr = (XGpio *)CallbackRef;
 
-    uint32_t gpio_val = XGpio_DiscreteRead(&Gpio2, ECHO_CHANNEL);
+    // Clear the interrupt first
+    XGpio_InterruptClear(GpioPtr, 1);
 
+    uint32_t curr = XGpio_DiscreteRead(GpioPtr, ECHO_CHANNEL) & 0x1; // bit0
     uint64_t now = XTmrCtr_GetValue(&TimerInstance, 0);
 
-    if (gpio_val) {
-        // Rising edge: Echo started
+    if (curr && !last_echo_state) {
+        // Rising edge
         echo_start = now;
         echo_done = 0;
     } 
-    else {
-        // Falling edge: Echo ended
+    else if (!curr && last_echo_state) {
+        // Falling edge
         echo_end = now;
         echo_done = 1;
     }
 
+    last_echo_state = curr;
 }
 
 int main(void)
@@ -362,6 +365,9 @@ int main(void)
     Xil_ExceptionInit();
     Xil_ExceptionRegisterHandler(XIL_EXCEPTION_ID_INT, (Xil_ExceptionHandler)XIntc_InterruptHandler, &IntcInstance);
     Xil_ExceptionEnable();
+
+    // After GPIO2 init and direction set:
+    last_echo_state = XGpio_DiscreteRead(&Gpio2, ECHO_CHANNEL) & 0x1;
 
     XGpio_InterruptEnable(&Gpio2, 0x1);  // Enable interrupt on first input pin (assuming echo on pin 0)
     XGpio_InterruptGlobalEnable(&Gpio2);
