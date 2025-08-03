@@ -43,6 +43,7 @@
 #define USE_HCSR04	    1
 #define USE_ADT7420	    1
 #define USE_ADXL362	    1
+#define USE_MPU6500     0
 
 /*
 	NOTES:
@@ -492,19 +493,20 @@ int main(void)
             xil_printf("X: %d, Y: %d, Z: %d\r\n", x_val, y_val, z_val);
         #endif
 
-        MPU6500_ReadAccel(&Spi1Instance, accel);
-        MPU6500_ReadGyro(&Spi1Instance, gyro);
-        MPU6500_ConvertGyroToDPS(gyro, gyro_dps);
+        #if USE_MPU6500
+            MPU6500_ReadAccel(&Spi1Instance, accel);
+            MPU6500_ReadGyro(&Spi1Instance, gyro);
+            MPU6500_ConvertGyroToDPS(gyro, gyro_dps);
 
-        //xil_printf("ACC: X=%d Y=%d Z=%d\r\n", accel[0], accel[1], accel[2]);
+            xil_printf("ACC: X=%d Y=%d Z=%d\r\n", accel[0], accel[1], accel[2]);
+            xil_printf("GYRO: X=%f Y=%f Z=%f\r\n", gyro_dps[0], gyro_dps[1], gyro_dps[2]);
+            /*xil_printf("GYRO: X=%d.%02d Y=%d.%02d Z=%d.%02d\r\n",
+                (int)gyro_dps[0], abs((int)(gyro_dps[0] * 100) % 100),
+                (int)gyro_dps[1], abs((int)(gyro_dps[1] * 100) % 100),
+                (int)gyro_dps[2], abs((int)(gyro_dps[2] * 100) % 100));
+            */
 
-        //xil_printf("GYRO: X=%f Y=%f Z=%f\r\n", gyro_dps[0], gyro_dps[1], gyro_dps[2]);
-        /*xil_printf("GYRO: X=%d.%02d Y=%d.%02d Z=%d.%02d\r\n",
-            (int)gyro_dps[0], abs((int)(gyro_dps[0] * 100) % 100),
-            (int)gyro_dps[1], abs((int)(gyro_dps[1] * 100) % 100),
-            (int)gyro_dps[2], abs((int)(gyro_dps[2] * 100) % 100));
-		*/
-
+        #endif
 
         XGpio_DiscreteWrite(&Gpio0, LED_CHANNEL, gyro[0]);
 
