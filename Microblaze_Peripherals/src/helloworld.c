@@ -40,11 +40,14 @@
 #include "xiic.h"
 #include "xil_exception.h"
 
-#define USE_HCSR04	    1
-#define USE_ADT7420	    1
-#define USE_ADXL362	    1
-#define USE_MPU6500     0
+#include "xil_testmem.h"
 
+
+#define USE_HCSR04	        1
+#define USE_ADT7420	        1
+#define USE_ADXL362	        1
+#define USE_MPU6500         0
+#define DDR2_MICROBLAZE     1       // If ddr2 ram is added to microblaze desing 
 /*
 	NOTES:
 
@@ -80,6 +83,8 @@ XGpio Gpio1;
 
 XGpio Gpio2;
 XIntc IntcInstance;   // Interrupt controller instance
+
+XGpio Gpio3;        // init calib pin of mig ddr2 
 
 XUartLite UartLite;		/* Instance of the UartLite Device */
 
@@ -376,7 +381,49 @@ int main(void)
 
 
 
+    #if DDR2_MICROBLAZE
+        // GPIO3 Init
+        if (XGpio_Initialize(&Gpio3, XPAR_XGPIO_3_BASEADDR) != XST_SUCCESS) {
+            xil_printf("GPIO init failed.\r\n");
+            return XST_FAILURE;
+        }
 
+        XGpio_SetDataDirection(&Gpio3, 1, 0x1); // Set as input
+        int calib_done = XGpio_DiscreteRead(&Gpio3, 1);
+
+        if (calib_done != 1) {
+            xil_printf("MIG calibration not done (GPIO3 = %d). Check wiring.\r\n", calib_done);
+            return XST_FAILURE;
+        }
+
+        xil_printf("MIG calibration done!\r\n");
+    #endif
+
+    
+    // Perform DDR test using Xilinx memory test API
+    // Bus width is 64 bit but test writes 32 bit data at each address
+    XStatus status = Xil_TestMem32((u32 *)XPAR_MIG_0_BASEADDRESS, 1024, 0x12345678, XIL_TESTMEM_ALLMEMTESTS);
+
+    if (status != XST_SUCCESS) {
+        xil_printf("DDR memory test FAILED\r\n");
+        return XST_FAILURE;
+    }
+
+    xil_printf("DDR memory test PASSED!\r\n");
+
+    // DDR Write
+     u8 *byte_ptr = (u8 *)XPAR_MIG_0_BASEADDRESS; // from starting address
+
+    // Write 10 bytes with incrementing values
+    for (int i = 0; i < 10; i++) {
+        byte_ptr[i] = (u8)i;
+    }
+
+
+    // Read and print 10 bytes
+    for (int i = 0; i < 10; i++) {
+        xil_printf("Byte %d = 0x%02X\r\n", i, byte_ptr[i]);
+    }
 
 
 	// UART0 Init
