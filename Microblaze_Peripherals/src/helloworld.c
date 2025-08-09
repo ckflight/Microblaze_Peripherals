@@ -42,6 +42,8 @@
 
 #include "xil_testmem.h"
 
+#include "xaxidma.h"
+
 
 #define USE_HCSR04	        1
 #define USE_ADT7420	        1
@@ -68,6 +70,14 @@
 #define TRIG_CHANNEL              	1
 
 #define ECHO_CHANNEL              	1
+
+
+#define DDR_BASE_ADDR      XPAR_DDR_MEM_BASEADDR  // Or your DDR2 base address in your system
+#define BUFFER_SIZE        1024  // Number of bytes to transfer (adjust as needed)
+
+XAxiDma AxiDma;   // DMA instance
+int TransferDone;
+
 
 XIntc IntcInstance;
 XIic IicInstance;
@@ -246,11 +256,44 @@ void GpioEchoHandler(void *CallbackRef) {
     last_echo_state = curr;
 }
 
+void DmaS2MMHandler(void *CallbackRef)
+{
+    u32 IrqStatus;
+    XAxiDma *AxiDmaInst = (XAxiDma *)CallbackRef;
+
+    // Read pending interrupts for S2MM channel
+    IrqStatus = XAxiDma_IntrGetIrq(AxiDmaInst, XAXIDMA_DEVICE_TO_DMA);
+
+    // Acknowledge pending interrupts
+    XAxiDma_IntrAckIrq(AxiDmaInst, IrqStatus, XAXIDMA_DEVICE_TO_DMA);
+
+    // Check for completion interrupt
+    if ((IrqStatus & XAXIDMA_IRQ_IOC_MASK)) {
+        xil_printf("DMA transfer complete\r\n");
+        TransferDone = 1;
+    }
+
+    // Check for error interrupt
+    if ((IrqStatus & XAXIDMA_IRQ_ERROR_MASK)) {
+        xil_printf("DMA transfer error\r\n");
+        TransferDone = -1;
+    }
+
+
+    uint64_t *ddr_ptr = XPAR_MIG_0_BASEADDRESS;
+
+    for (int i = 0; i < 256; i++) {
+        printf("DDR[%d] = %llu\r\n", i, (unsigned long long)ddr_ptr[i]);
+    }
+    
+}
+
 int main(void)
 {
 	int Status;
 
     xil_printf("CODE STARTED\r\n");
+
 
 
 
@@ -275,6 +318,8 @@ int main(void)
 
 
 
+
+
     // Initialize IIC driver
     Status = XIic_Initialize(&IicInstance0, XPAR_XIIC_0_BASEADDR);
     if (Status != XST_SUCCESS) {
@@ -289,6 +334,8 @@ int main(void)
         return XST_FAILURE;
     }
 	
+
+
 
 
 
@@ -311,6 +358,8 @@ int main(void)
 
 
 
+
+
 	// GPIO0 Init
 	Status = XGpio_Initialize(&Gpio0, XPAR_XGPIO_0_BASEADDR);
 	if (Status != XST_SUCCESS) {
@@ -325,6 +374,9 @@ int main(void)
 
 
 
+
+
+
 	// GPIO1 Init
 	Status = XGpio_Initialize(&Gpio1, XPAR_XGPIO_1_BASEADDR);
 	if (Status != XST_SUCCESS) {
@@ -334,6 +386,9 @@ int main(void)
 
 	XGpio_SetDataDirection(&Gpio1, TRIG_CHANNEL, 0x0); // both pins are output
 	
+
+
+
 
 
 
@@ -358,25 +413,17 @@ int main(void)
         return XST_FAILURE;
     }
 
-    // Start the interrupt controller in real mode
-    Status = XIntc_Start(&IntcInstance, XIN_REAL_MODE);
-    if (Status != XST_SUCCESS) {
-        return XST_FAILURE;
-    }
-
     // Enable the GPIO interrupt in the interrupt controller
     XIntc_Enable(&IntcInstance, XPAR_FABRIC_AXI_GPIO_2_INTR);
-
-    // Setup the exception handling for interrupts
-    Xil_ExceptionInit();
-    Xil_ExceptionRegisterHandler(XIL_EXCEPTION_ID_INT, (Xil_ExceptionHandler)XIntc_InterruptHandler, &IntcInstance);
-    Xil_ExceptionEnable();
 
     // After GPIO2 init and direction set:
     last_echo_state = XGpio_DiscreteRead(&Gpio2, ECHO_CHANNEL) & 0x1;
 
     XGpio_InterruptEnable(&Gpio2, 0x1);  // Enable interrupt on first input pin (assuming echo on pin 0)
     XGpio_InterruptGlobalEnable(&Gpio2);
+
+
+
 
 
 
@@ -411,6 +458,7 @@ int main(void)
 
     xil_printf("DDR memory test PASSED!\r\n");
 
+    /*
     // DDR Write
      u8 *byte_ptr = (u8 *)XPAR_MIG_0_BASEADDRESS; // from starting address
 
@@ -425,6 +473,78 @@ int main(void)
         xil_printf("Byte %d = 0x%02X\r\n", i, byte_ptr[i]);
     }
 
+    */
+
+    // I check the content of the ddr2 before dma and it is random numbers
+    uint64_t *ddr_ptr = XPAR_MIG_0_BASEADDRESS;
+
+    for (int i = 0; i < 256; i++) {
+        printf("DDR[%d] = %llu\r\n", i, (unsigned long long)ddr_ptr[i]);
+    }
+
+
+    // DMA Init
+
+    XAxiDma_Config *CfgPtr;
+
+    CfgPtr = XAxiDma_LookupConfig(XPAR_XAXIDMA_0_BASEADDR);
+    if (!CfgPtr) {
+        xil_printf("No config found for DMA\r\n");
+        return XST_FAILURE;
+    }
+
+    Status = XAxiDma_CfgInitialize(&AxiDma, CfgPtr);
+    if (Status != XST_SUCCESS) {
+        xil_printf("DMA initialization failed\r\n");
+        return XST_FAILURE;
+    }
+
+    if(XAxiDma_HasSg(&AxiDma)){
+        xil_printf("DMA configured in Scatter-Gather mode\r\n");
+    }
+
+    // Disable interrupts initially
+    XAxiDma_IntrDisable(&AxiDma, XAXIDMA_IRQ_ALL_MASK, XAXIDMA_DEVICE_TO_DMA);
+
+   // Connect DMA interrupt handler
+    Status = XIntc_Connect(&IntcInstance, XPAR_FABRIC_AXI_DMA_0_INTR, (XInterruptHandler)DmaS2MMHandler, &AxiDma);
+    if (Status != XST_SUCCESS) {
+        xil_printf("DMA interrupt connect failed\r\n");
+        return XST_FAILURE;
+    }
+
+    XIntc_Enable(&IntcInstance, XPAR_FABRIC_AXI_DMA_0_INTR);
+
+        
+    // Start the interrupt controller in real mode
+    Status = XIntc_Start(&IntcInstance, XIN_REAL_MODE);
+    if (Status != XST_SUCCESS) {
+        return XST_FAILURE;
+    }
+
+    // Setup the exception handling for interrupts
+    Xil_ExceptionInit();
+    Xil_ExceptionRegisterHandler(XIL_EXCEPTION_ID_INT, (Xil_ExceptionHandler)XIntc_InterruptHandler, &IntcInstance);
+    Xil_ExceptionEnable();
+
+    XAxiDma_IntrEnable(&AxiDma, XAXIDMA_IRQ_IOC_MASK | XAXIDMA_IRQ_ERROR_MASK, XAXIDMA_DEVICE_TO_DMA);
+
+
+    // Starting a DMA transfer
+    Status = XAxiDma_SimpleTransfer(&AxiDma, (UINTPTR)XPAR_MIG_0_BASEADDRESS, 2048, XAXIDMA_DEVICE_TO_DMA);
+    if (Status != XST_SUCCESS) {
+        xil_printf("DMA transfer start failed\n");
+        return XST_FAILURE;
+    }
+
+
+
+
+
+
+
+
+
 
 	// UART0 Init
 	Status = XUartLite_Initialize(&UartLite, 0);
@@ -437,6 +557,9 @@ int main(void)
 	if (Status != XST_SUCCESS) {
 		return XST_FAILURE;
 	}
+
+
+
 
 
 
@@ -461,6 +584,8 @@ int main(void)
 
 
 
+
+
     // SPI1 Init
     Status = XSpi_Initialize(&Spi1Instance, XPAR_AXI_QUAD_SPI_1_BASEADDR);
     if (Status != XST_SUCCESS) {
@@ -477,6 +602,9 @@ int main(void)
 
     XSpi_Start(&Spi1Instance);// Start the SPI driver
     XSpi_IntrGlobalDisable(&Spi1Instance); // Disable global interrupt mode
+
+
+
 
 
 
