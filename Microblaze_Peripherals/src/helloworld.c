@@ -282,7 +282,7 @@ void DmaS2MMHandler(void *CallbackRef)
 
     uint64_t *ddr_ptr = XPAR_MIG_0_BASEADDRESS;
 
-    for (int i = 0; i < 256; i++) {
+    for (int i = 0; i < 512; i++) {
         printf("DDR[%d] = %llu\r\n", i, (unsigned long long)ddr_ptr[i]);
     }
     
@@ -478,7 +478,7 @@ int main(void)
     // I check the content of the ddr2 before dma and it is random numbers
     uint64_t *ddr_ptr = XPAR_MIG_0_BASEADDRESS;
 
-    for (int i = 0; i < 256; i++) {
+    for (int i = 0; i < 512; i++) {
         printf("DDR[%d] = %llu\r\n", i, (unsigned long long)ddr_ptr[i]);
     }
 
@@ -531,7 +531,7 @@ int main(void)
 
 
     // Starting a DMA transfer
-    Status = XAxiDma_SimpleTransfer(&AxiDma, (UINTPTR)XPAR_MIG_0_BASEADDRESS, 2048, XAXIDMA_DEVICE_TO_DMA);
+    Status = XAxiDma_SimpleTransfer(&AxiDma, (UINTPTR)XPAR_MIG_0_BASEADDRESS, 512*8, XAXIDMA_DEVICE_TO_DMA);
     if (Status != XST_SUCCESS) {
         xil_printf("DMA transfer start failed\n");
         return XST_FAILURE;
