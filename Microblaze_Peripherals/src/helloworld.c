@@ -48,7 +48,8 @@
 #define USE_HCSR04	        1
 #define USE_ADT7420	        1
 #define USE_ADXL362	        1
-#define USE_MPU6500         0
+#define USE_MPU6500_SPI     0
+#define USE_MPU6500_I2C     1
 #define DDR2_MICROBLAZE     1       // If ddr2 ram is added to microblaze desing 
 /*
 	NOTES:
@@ -286,6 +287,65 @@ void DmaS2MMHandler(void *CallbackRef)
         printf("DDR[%d] = %llu\r\n", i, (unsigned long long)ddr_ptr[i]);
     }
     
+}
+
+int i2c_write_register(XIic *iic, u8 slave7, u8 reg, u8 value) {
+    u8 data[2] = {reg, value};
+    int byte_num = XIic_Send(iic->BaseAddress, slave7, data, 2, XIIC_STOP);
+    return byte_num;
+}
+
+int i2c_read_bytes(XIic *iic, u8 slave7, u8 reg, u8 *out, int len) {
+    int byte_num;
+
+    byte_num = XIic_Send(iic->BaseAddress, slave7, &reg, 1, XIIC_REPEATED_START);
+    if (byte_num != 1) return 0;
+
+    byte_num = XIic_Recv(iic->BaseAddress, slave7, out, len, XIIC_STOP);
+    return byte_num;
+}
+
+int MPU6500_I2C_Init(XIic *iic) {
+    int status;
+    
+    // Wake up device (clear sleep bit)
+    status = i2c_write_register(iic, 0x68, 0x6B, 0x00);
+    if (status != 2) return -1;
+
+    // Set Gyro full-scale range to ±250 dps
+    i2c_write_register(iic, 0x68, 0x1B, 0x00);
+
+    // Set Accel full-scale range to ±2g
+    i2c_write_register(iic, 0x68, 0x1C, 0x00);
+
+    return 0;
+}
+
+int MPU6500_I2C_ReadAccel(XIic *iic, int16_t *accel_out) {
+    u8 data[6];
+    if (i2c_read_bytes(iic, 0x68, 0x3B, data, 6) != 6) return -1;
+
+    for (int i = 0; i < 3; i++) {
+        accel_out[i] = (int16_t)((data[2*i] << 8) | data[2*i + 1]);
+    }
+    return 0;
+}
+
+int MPU6500_I2C_ReadGyro(XIic *iic, int16_t *gyro_out) {
+    u8 data[6];
+    if (i2c_read_bytes(iic, 0x68, 0x43, data, 6) != 6) return -1;
+
+    for (int i = 0; i < 3; i++) {
+        gyro_out[i] = (int16_t)((data[2*i] << 8) | data[2*i + 1]);
+    }
+    return 0;
+}
+
+void MPU6500_ConvertGyroToDPS_I2C(int16_t *gyro_raw, float *gyro_dps_out) {
+    const float sensitivity = 131.0f; // For ±250 dps
+    for (int i = 0; i < 3; i++) {
+        gyro_dps_out[i] = (float)gyro_raw[i] / sensitivity;
+    }
 }
 
 int main(void)
@@ -648,6 +708,14 @@ int main(void)
         xil_printf("I2C read failed\r\n");
     }
 
+    // I2C INIT
+    if (MPU6500_I2C_Init(&IicInstance1) != 0) {
+        xil_printf("MPU6500 I2C init failed\r\n");
+    } else {
+        xil_printf("MPU6500 I2C init success\r\n");
+    }
+
+
 	while (1) {
 		
         u64 start = XTmrCtr_GetValue(&TimerInstance, 0);
@@ -668,19 +736,35 @@ int main(void)
             xil_printf("X: %d, Y: %d, Z: %d\r\n", x_val, y_val, z_val);
         #endif
 
-        #if USE_MPU6500
+        #if USE_MPU6500_SPI
             MPU6500_ReadAccel(&Spi1Instance, accel);
             MPU6500_ReadGyro(&Spi1Instance, gyro);
             MPU6500_ConvertGyroToDPS(gyro, gyro_dps);
 
             xil_printf("ACC: X=%d Y=%d Z=%d\r\n", accel[0], accel[1], accel[2]);
             xil_printf("GYRO: X=%f Y=%f Z=%f\r\n", gyro_dps[0], gyro_dps[1], gyro_dps[2]);
-            /*xil_printf("GYRO: X=%d.%02d Y=%d.%02d Z=%d.%02d\r\n",
+            xil_printf("GYRO: X=%d.%02d Y=%d.%02d Z=%d.%02d\r\n",
                 (int)gyro_dps[0], abs((int)(gyro_dps[0] * 100) % 100),
                 (int)gyro_dps[1], abs((int)(gyro_dps[1] * 100) % 100),
                 (int)gyro_dps[2], abs((int)(gyro_dps[2] * 100) % 100));
-            */
+            
 
+        #endif
+
+        #if USE_MPU6500_I2C
+            int16_t accel_i2c[3], gyro_i2c[3];
+            float gyro_dps_i2c[3];
+
+            if (MPU6500_I2C_ReadAccel(&IicInstance1, accel_i2c) == 0 &&
+                MPU6500_I2C_ReadGyro(&IicInstance1, gyro_i2c) == 0) {
+
+                MPU6500_ConvertGyroToDPS_I2C(gyro_i2c, gyro_dps_i2c);
+
+                xil_printf("MPU6500 I2C ACC: X=%d Y=%d Z=%d\r\n", accel_i2c[0], accel_i2c[1], accel_i2c[2]);
+                printf("MPU6500 I2C GYRO: X=%0.2f Y=%0.2f Z=%0.2f\r\n", gyro_dps_i2c[0], gyro_dps_i2c[1], gyro_dps_i2c[2]);
+            } else {
+                xil_printf("MPU6500 I2C read failed\r\n");
+            }
         #endif
 
         XGpio_DiscreteWrite(&Gpio0, LED_CHANNEL, gyro[0]);
