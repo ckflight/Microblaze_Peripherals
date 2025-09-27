@@ -86,7 +86,6 @@ XIic IicInstance;
 XTmrCtr TimerInstance;
 
 XSpi Spi0Instance;
-XSpi Spi1Instance;
 
 XGpio Gpio0; /* The Instance of the GPIO Driver */
 
@@ -644,40 +643,11 @@ int main(void)
 
 
 
-
-
-    // SPI1 Init
-    Status = XSpi_Initialize(&Spi1Instance, XPAR_AXI_QUAD_SPI_1_BASEADDR);
-    if (Status != XST_SUCCESS) {
-        xil_printf("SPI Initialization Failed\r\n");
-        return XST_FAILURE;
-    }
-
-    // Set options: master mode and manual slave select
-    Status = XSpi_SetOptions(&Spi1Instance, XSP_MASTER_OPTION | XSP_MANUAL_SSELECT_OPTION | XSP_CLK_PHASE_1_OPTION | XSP_CLK_ACTIVE_LOW_OPTION);
-    if (Status != XST_SUCCESS) {
-        xil_printf("SPI SetOptions Failed\r\n");
-        return XST_FAILURE;
-    }
-
-    XSpi_Start(&Spi1Instance);// Start the SPI driver
-    XSpi_IntrGlobalDisable(&Spi1Instance); // Disable global interrupt mode
-
-
-
-
-
-
-
 	ADXL362_SoftReset(&Spi0Instance);
 	ADXL362_Init(&Spi0Instance);
 
     dev_id = ADXL362_ReadDeviceID(&Spi0Instance);
 	xil_printf("ADXL362 dev_id: %d\r\n", dev_id);
-
-    // Initialize MPU6500
-    dev_id = MPU6500_Init(&Spi1Instance);
-	xil_printf("MPU6500 dev_id: %d\r\n", dev_id);
 
 
     u8 bytes_recv = 0;
@@ -736,7 +706,8 @@ int main(void)
             xil_printf("X: %d, Y: %d, Z: %d\r\n", x_val, y_val, z_val);
         #endif
 
-        #if USE_MPU6500_SPI
+        // I have deleted this spi from microblze design for resource but i keep this part as an example
+        /*#if USE_MPU6500_SPI
             MPU6500_ReadAccel(&Spi1Instance, accel);
             MPU6500_ReadGyro(&Spi1Instance, gyro);
             MPU6500_ConvertGyroToDPS(gyro, gyro_dps);
@@ -749,7 +720,8 @@ int main(void)
                 (int)gyro_dps[2], abs((int)(gyro_dps[2] * 100) % 100));
             
 
-        #endif
+        #endif*/
+
 
         #if USE_MPU6500_I2C
             int16_t accel_i2c[3], gyro_i2c[3];
