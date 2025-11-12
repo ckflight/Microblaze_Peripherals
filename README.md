@@ -78,19 +78,19 @@ All firmware sources are organized under `src/` for Vitis integration:
 
 ## 📊 Console Output Example
 
-• CODE STARTED
-• MIG calibration done!
-• DDR memory test PASSED!
-• ADXL362 dev_id: 173
-• ADT7420 dev_id: 192
-• MPU6050 dev_id: 104
-• MPU6500 I2C init success
-• X: 12, Y: -8, Z: 1024
-• MPU6500 I2C ACC: X=123 Y=-22 Z=1050
-• MPU6500 I2C GYRO: X=0.18 Y=-0.06 Z=0.02
-• Temperature: 24.75 °C
-• Distance: 37.420 cm
-• DMA transfer complete
+● CODE STARTED
+● MIG calibration done!
+● DDR memory test PASSED!
+● ADXL362 dev_id: 173
+● ADT7420 dev_id: 192
+● MPU6050 dev_id: 104
+● MPU6500 I2C init success
+● X: 12, Y: -8, Z: 1024
+● MPU6500 I2C ACC: X=123 Y=-22 Z=1050
+● MPU6500 I2C GYRO: X=0.18 Y=-0.06 Z=0.02
+● Temperature: 24.75 °C
+● Distance: 37.420 cm
+● DMA transfer complete
 
 
 ---
