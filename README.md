@@ -78,22 +78,24 @@ All firmware sources are organized under `src/` for Vitis integration:
 
 ## 📊 Console Output Example
 
-● CODE STARTED
-● MIG calibration done!
-● DDR memory test PASSED!
-● ADXL362 dev_id: 173
-● ADT7420 dev_id: 192
-● MPU6050 dev_id: 104
-● MPU6500 I2C init success
-● X: 12, Y: -8, Z: 1024
-● MPU6500 I2C ACC: X=123 Y=-22 Z=1050
-● MPU6500 I2C GYRO: X=0.18 Y=-0.06 Z=0.02
-● Temperature: 24.75 °C
-● Distance: 37.420 cm
-● DMA transfer complete
-
+| Log Output | Description |
+|-------------|-------------|
+| **CODE STARTED** | Firmware initialized successfully |
+| **MIG calibration done!** | DDR2 memory interface calibrated and ready |
+| **DDR memory test PASSED!** | Memory verified via `Xil_TestMem32()` |
+| **ADXL362 dev_id: 173** | SPI accelerometer detected successfully |
+| **ADT7420 dev_id: 192** | I²C temperature sensor initialized |
+| **MPU6050 dev_id: 104** | Secondary IMU device identified |
+| **MPU6500 I²C init success** | Primary IMU initialized over I²C |
+| **X: 12, Y: -8, Z: 1024** | ADXL362 accelerometer readings |
+| **MPU6500 I²C ACC: X=123 Y=-22 Z=1050** | MPU6500 accelerometer data |
+| **MPU6500 I²C GYRO: X=0.18 Y=-0.06 Z=0.02** | MPU6500 gyroscope data (°/s) |
+| **Temperature: 24.75 °C** | ADT7420 temperature output |
+| **Distance: 37.420 cm** | Ultrasonic distance measurement (HC-SR04) |
+| **DMA transfer complete** | AXI DMA transfer to DDR2 finished successfully |
 
 ---
+
 
 ## 🧾 License
 
